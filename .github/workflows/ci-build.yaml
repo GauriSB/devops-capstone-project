@@ -11,26 +11,58 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    
+    container: python:3.9-slim
+
+    services:
+      postgres:
+        image: postgres:alpine
+        ports:
+          - 5432:5432
+        env:
+          POSTGRES_PASSWORD: pgs3cr3t
+          POSTGRES_DB: testdb
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v2
-    
-    - name: Set up Python
-      uses: actions/setup-python@v2
-      with:
-        python-version: '3.9'
-    
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-    
-    - name: Run linting
-      run: |
-        pip install flake8
-        flake8 .
-    
-    - name: Run tests
-      run: |
-        pytest --maxfail=1 --disable-warnings -q
+      # Checkout the repository code
+      - name: Checkout Code
+        uses: actions/checkout@v2
+
+      # Set up Python environment
+      - name: Set up Python 3.9
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.9'
+
+      # Install dependencies
+      - name: Install Dependencies
+        run: |
+          pip install -r requirements.txt
+
+      # Run Linting (optional, if you have a linter setup)
+      - name: Run Linting
+        run: |
+          pip install pylint
+          pylint **/*.py
+
+      # Run tests
+      - name: Run Tests
+        run: |
+          pytest
+
+      # Check if the PostgreSQL service is ready before running tests
+      - name: Wait for PostgreSQL
+        run: |
+          dockerize -wait tcp://localhost:5432 -timeout 1m
+
+      # (Optional) Add a badge to the README to show build status
+      - name: Add build status badge
+        run: |
+          echo "![CI Build](https://github.com/${{ github.repository }}/actions/workflows/ci-build.yaml/badge.svg)" >> README.md
+          git add README.md
+          git commit -m "Update README with build badge"
+          git push
